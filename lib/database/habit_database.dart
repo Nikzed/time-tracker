@@ -48,6 +48,9 @@ class HabitDatabase {
       where: 'id = ?',
       whereArgs: [habit.id],
     );
+    getHabits().then((List<Habit> habits) {
+      habits.forEach((habit) => print(habit.checkedDays));
+    });
   }
 
   Future<void> deleteHabit(int id) async {

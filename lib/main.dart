@@ -1,14 +1,12 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_layout_grid/flutter_layout_grid.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:habit_tracker/entities/habit.dart';
 import 'package:habit_tracker/database/habit_database.dart';
 import 'package:habit_tracker/widgets/card_demo_screen.dart';
-import 'package:habit_tracker/widgets/habit_tile.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -150,19 +148,69 @@ class _MyHomePageState extends State<MyHomePage> {
             //   ),
             // );
             /// flutter_staggered_grid_view
+            // return SingleChildScrollView(
+            //   child: StaggeredGrid.count(
+            //     crossAxisCount: 2,
+            //     children: habits.data!
+            //         .map((_) =>
+            //             const StaggeredGridTile.count(crossAxisCellCount: 1, mainAxisCellCount: 1, child: HabitTile()))
+            //         .toList(),
+            //   ),
+            // );
             return SingleChildScrollView(
-              child: StaggeredGrid.count(
-                crossAxisCount: 2,
-                children: habits.data!
-                    .map((_) =>
-                        const StaggeredGridTile.count(crossAxisCellCount: 1, mainAxisCellCount: 1, child: HabitTile()))
-                    .toList(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 6),
+                  Column(
+                    children: habits.data!
+                        .map(
+                          (Habit habit) => habit.checkedDays.any((dateTime) =>
+                                  dateTime.year == DateTime.now().year &&
+                                  dateTime.month == DateTime.now().month &&
+                                  dateTime.day == DateTime.now().day)
+                              ? const SizedBox()
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.brown,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        habit.name,
+                                        style: const TextStyle(fontSize: 17, color: Colors.white),
+                                      ),
+                                      const Spacer(),
+                                      IconButton(
+                                        splashRadius: 12,
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () {
+                                          habit.checkedDays.add(DateTime.now());
+                                          database.updateHabit(habit.copyWith(checkedDays: habit.checkedDays));
+                                          setState(() {});
+                                        },
+                                        icon: const Icon(
+                                          Icons.circle_outlined,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 6),
+                ],
               ),
             );
           }),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showAddHabitSheet();
+          _showAddHabitPopUp();
+          // _showAddHabitSheet();
         },
         tooltip: 'New habit',
         child: const Icon(Icons.add),
@@ -170,53 +218,48 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  _showAddHabitSheet() {
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  void _showAddHabitPopUp() {
     final TextEditingController controller = TextEditingController();
-    showModalBottomSheet(
+
+    WoltModalSheet.show(
       context: context,
-      builder: (BuildContext context) {
-        return Padding(
-          padding: const EdgeInsets.all(12),
-          child: Form(
-            key: formKey,
+      pageListBuilder: (modalSheetContext) {
+        return [
+          WoltModalSheetPage(
+            topBarTitle: const Text(
+              'New Task',
+              style: TextStyle(color: Colors.black),
+            ),
+            isTopBarLayerAlwaysVisible: true,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const Center(
-                  child: Text('New Habit'),
+                Padding(
+                  padding: const EdgeInsets.all(14.0),
+                  child: TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Task name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    ),
+                  ),
                 ),
-                TextFormField(
-                  controller: controller,
-                  validator: validateHabitName,
-                  onChanged: (value) {
-                    if (value.length == 1) {
-                      formKey.currentState!.validate();
+                ElevatedButton(
+                  onPressed: () async {
+                    await database.insertHabit(Habit(name: controller.text, startDate: DateTime.now()));
+                    if (modalSheetContext.mounted) {
+                      Navigator.pop(modalSheetContext);
+                      setState(() {});
                     }
                   },
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xffbd9e8a)),
-                    onPressed: () async {
-                      if (!formKey.currentState!.validate()) {
-                        return;
-                      }
-                      await database.insertHabit(Habit(name: controller.text, startDate: DateTime.now()));
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        setState(() {});
-                      }
-                    },
-                    child: Text('Confirm', style: TextStyle(color: Colors.brown[900], fontWeight: FontWeight.normal)),
-                  ),
+                  child: const Text('Confirm'),
                 ),
               ],
             ),
           ),
-        );
+        ];
+      },
+      modalTypeBuilder: (context) {
+        return WoltModalType.dialog();
       },
     );
   }
